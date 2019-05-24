@@ -1,5 +1,6 @@
 import re
 from Tile import Tile
+from QuestTile import QuestTile
 class Map(object):
     def __init__(self, filename):
         self.mapfile = filename
@@ -17,22 +18,41 @@ class Map(object):
                     col.Update(dt) 
 
     def CheckHit(self, player):
-        hit = False
+        hitx = False
+        hity = False
+        
         for row in self.Tiles:
             for col in row:
+                hitTilex = False
+                hitTiley = False
                 if(col.hit):
+                    if (col.x < player.nextx + 31 and
+                        col.x + 31 > player.nextx and 
+                        col.y < player.y + 31 and
+                        col.y + 31 > player.y):
+                        hitx = col.Hit(player)
+                        hitTilex = True
+
                     if (col.x < player.x + 31 and
                         col.x + 31 > player.x and 
-                        col.y < player.y + 31 and
-                        col.y + 31 > player.y): 
-                        ## switch to checking the move location and moving back based on each
-                        ## two if statements to check current x and move y and then the second is move x and current y
-                        col.Hit(player) ## move back
-                        hit = True
-                    if(hit):
-                        break
-            if(hit): ## this could break with multiple tiles
-                break
+                        col.y < player.nexty + 31 and
+                        col.y + 31 > player.nexty): 
+                        hity = col.Hit(player)
+                        hitTiley = True
+                    
+                    if(not hitTiley and not hitTilex):
+                        col.ResetHit()
+        
+        if(not hitx):
+            player.x = player.nextx
+        else:
+            player.nextx = player.x
+        if(not hity):
+            player.y = player.nexty
+        else:
+            player.nexty = player.y
+        
+                    
 
     def Load(self):
         with open(self.mapfile, 'r') as f:
@@ -43,7 +63,7 @@ class Map(object):
 
         for m in re.findall(r"{([^}]*)}",self.text):
             loader = MapLoader(m)
-            self.Tiles = loader.Load()
+            self.Tiles = loader.Load(self.Tiles)
 
     def Render(self, surface, playerpos):
         self.worldx,self.worldy = playerpos
@@ -57,7 +77,8 @@ class MapLoader(object):
         self.Key = {}
         self.Tiles = []
     
-    def Load(self):
+    def Load(self, Tiles):
+        self.Tiles = Tiles
         loadingstate = 0
         text = ""
         fullmap = ""
@@ -93,14 +114,21 @@ class MapLoader(object):
         for k in keytext:
             kdict = {}
             for i in re.sub(r"\[|\],?","",k[k.find(":")+1:]).split("|"):
-                if(i[:i.find("=")] == "hit"):
+                ## check for attributes and add them to a dictionary
+                if(i[:i.find("=")] == "hit"
+                    or i[:i.find("=")] == "animate"):
                     kdict[i[:i.find("=")]] = bool(i[i.find("=")+1:])
                 if(i[:i.find("=")] == "color"):
                     kdict[i[:i.find("=")]] = tuple(list(map(int,re.sub(r"\(|\)","",i[i.find("=")+1:]).split(','))))
-                if(i[:i.find("=")] == "sprite"):
+                if(i[:i.find("=")] == "type" 
+                    or i[:i.find("=")] == "id" 
+                    or i[:i.find("=")] == "sprite"):
                     kdict[i[:i.find("=")]] = i[i.find("=")+1:].replace('"', '')
-                if(i[:i.find("=")] == "animate"):
-                    kdict[i[:i.find("=")]] = bool(i[i.find("=")+1:])
+                if(i[:i.find("=")] == "time"):
+                    kdict[i[:i.find("=")]] = float(i[i.find("=")+1:].replace('"', ''))
+                if(i[:i.find("=")] == "start" ):
+                    kdict[i[:i.find("=")]] = int(i[i.find("=")+1:].replace('"', ''))
+                    
             self.Key[k[:k.find(":")]] = kdict
         
         for k in self.Key:
@@ -108,17 +136,47 @@ class MapLoader(object):
 
     def LoadMap(self,text):
         rows = text.split(',')
-        xpos = 0
-        ypos = 0
-        count = 0
+        if(self.Tiles == []): 
+            buildtiles = True 
+        else: 
+            buildtiles = False
+
+
+        xsize = 32
+        ysize = 32
+        y = 0
+        x = 0
         for r in rows:
-            self.Tiles.append([])
+            if(buildtiles):
+                self.Tiles.append([])
             for c in r:
-                self.Tiles[count].append(Tile(xpos,ypos,self.Key[c].get("color",(255,255,255)),self.Key[c].get("hit", False), self.Key[c].get("sprite", 0)))
-                xpos += 32
-            xpos = 0
-            ypos += 32
-            count += 1
+                if(buildtiles):
+                    ## check type of Tile and default to base tile
+                    if(self.Key[c].get("type", False)):
+                        if(self.Key[c].get("type") == "Quest"):
+                            self.Tiles[y].append(QuestTile((xsize*x,ysize*y)))
+                    else:
+                        self.Tiles[y].append(Tile((xsize*x,ysize*y)))
+                ## Update the color of the tile
+                if(self.Key[c].get("color", False)):
+                    self.Tiles[y][x].UpdateLoad("color",self.Key[c]["color"])
+                ## Updates time for tiles that need it
+                if(self.Key[c].get("time", False)):
+                    self.Tiles[y][x].UpdateLoad("time", self.Key[c]["time"])
+                ## Gives an Id for Quests(or anything else that needs an id)
+                if(self.Key[c].get("id", False)):
+                    self.Tiles[y][x].UpdateLoad("id", self.Key[c]["id"])
+                if(self.Key[c].get("start", False)):
+                    self.Tiles[y][x].UpdateLoad("start",self.Key[c].get("start"))
+                ## update the Hit detection
+                if(self.Key[c].get("hit", False)):
+                    self.Tiles[y][x].UpdateLoad("hit",self.Key[c].get("hit"))
+                ## update the sprite
+                if(self.Key[c].get("sprite", False)):
+                    self.Tiles[y][x].UpdateLoad("sprite",self.Key[c].get("sprite"))
+                x += 1
+            x = 0
+            y += 1
 
 # somemap = Map("Map.txt")
 

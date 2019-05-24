@@ -1,19 +1,28 @@
 import pygame
 class Tile(object):
-    def __init__(self, x, y, color, hit,image):
-        self.x = x
-        self.y = y
-        self.color = color
-        self.hit = hit
+    def __init__(self, pos):
+        self.x = pos[0]
+        self.y = pos[1]
+        self.color = (0,0,0)
+        self.hit = False
         self.height = 0
         self.animationTimer = 0
         self.animation = 0
         self.sprite = []
-        if(image): ## Fix and use the animation bool from load (animate amount for range)
-            image[:image.find("0")]
-            for i in range(0,2):
-                self.sprite.append(pygame.image.load(image[:image.find("0")]+ str(i) + ".png"))
     
+    def UpdateLoad(self, attr, value):
+        ## sets color value
+        if(attr == "color"):
+            self.color = value
+        ## sets hit value
+        if(attr == "hit"):
+            self.hit = value
+        ## sets sprite list up
+        ## needs updated to find out how many sprites
+        if(attr == "sprite"):
+            for i in range(0,2):
+                self.sprite.append(pygame.image.load(value[:value.find("0")]+ str(i) + ".png"))
+
     def Update(self, dt):
         self.animationTimer += dt
         if(self.animationTimer >= .5):
@@ -25,14 +34,12 @@ class Tile(object):
 
 
     def Hit(self, player):
-        ## move dir and if a specific direction then move back
-        if(player.lastx):
-            player.x = player.lastx
-        if(player.lasty):
-            player.y = player.lasty
-        
-        player.lastx = 0
-        player.lasty = 0
+        ## comes out with other tile types
+        ## player.statuseffects.append(["DOT",2,2])
+        return True
+    
+    def ResetHit(self):
+        return True
 
     def Render(self, surface,xOffset,yOffset):
         if(len(self.sprite)):

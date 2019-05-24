@@ -24,7 +24,8 @@ class Game(object):
             self.screen.fill((0,0,0))
 
             events = pygame.event.get()
-
+            ## setup something to do when quests are done
+            self.done = self.player.done
             # events list
             for e in events:
                 if e.type == pygame.QUIT:
@@ -42,6 +43,7 @@ class Game(object):
             self.map.CheckHit(self.player)
 
             self.map.Update(self.starttime - self.lasttime)
+            self.player.Update(self.starttime - self.lasttime)
             ## not done
             self.map.Render(self.screen,(400-self.player.x,304-self.player.y))
             self.player.Render(self.screen)

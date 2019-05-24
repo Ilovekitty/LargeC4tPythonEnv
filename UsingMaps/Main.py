@@ -1,6 +1,6 @@
-import Game
+from Game import Game
 
-ourgame = Game.Game()
+ourgame = Game()
 
 ourgame.GameLoop()
 
